@@ -783,12 +783,31 @@ export default function App() {
             </div>
             {venturesLoading ? <div style={{ fontSize: "12.5px", color: "rgba(234,228,214,0.4)" }}>Loading…</div> : filteredVentures.length === 0 ? <div style={{ fontSize: "12.5px", color: "rgba(234,228,214,0.4)" }}>No ventures yet.</div> : (
               <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                {filteredVentures.map((v) => (
-                  <button key={v.id} onClick={() => { setSelectedVentureId(v.id); setCreatingVenture(false); }} style={{ textAlign: "left", padding: "10px", borderRadius: "8px", border: selectedVentureId === v.id ? "1px solid rgba(217,140,61,0.4)" : "1px solid rgba(234,228,214,0.12)", background: selectedVentureId === v.id ? "rgba(217,140,61,0.14)" : "rgba(234,228,214,0.05)", cursor: "pointer", color: "#EAE4D6" }}>
-                    <div style={{ fontSize: "13.5px", fontWeight: 600 }}>{v.title}</div>
-                    <div style={{ fontSize: "11px", color: "rgba(234,228,214,0.5)" }}>{v.pathway === "problem" ? "Problem-Driven" : "Research/IP-Driven"} · {(v.memberIds || []).length} member{(v.memberIds || []).length === 1 ? "" : "s"}</div>
-                  </button>
-                ))}
+                {filteredVentures.map((v) => {
+                  const isMember = (v.memberIds || []).includes(me.id);
+                  return (
+                    <div
+                      key={v.id}
+                      onClick={() => { setSelectedVentureId(v.id); setCreatingVenture(false); }}
+                      style={{ textAlign: "left", padding: "10px", borderRadius: "8px", border: selectedVentureId === v.id ? "1px solid rgba(217,140,61,0.4)" : "1px solid rgba(234,228,214,0.12)", background: selectedVentureId === v.id ? "rgba(217,140,61,0.14)" : "rgba(234,228,214,0.05)", cursor: "pointer", color: "#EAE4D6" }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: "13.5px", fontWeight: 600 }}>{v.title}</div>
+                          <div style={{ fontSize: "11px", color: "rgba(234,228,214,0.5)" }}>{v.pathway === "problem" ? "Problem-Driven" : "Research/IP-Driven"} · {(v.memberIds || []).length} member{(v.memberIds || []).length === 1 ? "" : "s"}</div>
+                        </div>
+                        {!isMember && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); joinVenture(v); }}
+                            style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: "4px", fontSize: "11px", color: "#16283A", background: "#D98C3D", border: "none", borderRadius: "6px", padding: "5px 9px", cursor: "pointer", fontWeight: 600 }}
+                          >
+                            <LogIn size={11} /> Join
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </aside>
