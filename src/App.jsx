@@ -44,7 +44,8 @@ export default function App() {
   const [authNotice, setAuthNotice] = useState("");
   const [authBusy, setAuthBusy] = useState(false);
   const [authForm, setAuthForm] = useState({
-    name: "", email: "", password: "", role: "", focus: "", tags: "", bio: "", contact: "", adminCode: "",
+    name: "", email: "", password: "", programmeDegree: "", researchArea: "", skills: "",
+    tags: "", lookingFor: "", bio: "", linkedin: "", photoUrl: "", adminCode: "",
   });
 
   useEffect(() => {
@@ -91,11 +92,14 @@ export default function App() {
       const { error: profileError } = await supabase.from("profiles").insert({
         id: data.user.id,
         name: authForm.name.trim(),
-        role: authForm.role.trim(),
-        focus: authForm.focus.trim(),
+        programme_degree: authForm.programmeDegree.trim(),
+        research_area: authForm.researchArea.trim(),
+        skills: authForm.skills.trim(),
         tags: authForm.tags.split(",").map((t) => t.trim()).filter(Boolean),
+        looking_for: authForm.lookingFor.trim(),
         bio: authForm.bio.trim(),
-        contact: authForm.contact.trim(),
+        linkedin: authForm.linkedin.trim(),
+        photo_url: authForm.photoUrl.trim(),
       });
       if (profileError) throw profileError;
 
@@ -229,16 +233,30 @@ export default function App() {
   useEffect(() => { if (tab === "directory" && me) loadDirectory(); }, [tab, me]);
 
   function openEditForm() {
-    setProfileForm({ role: me.role || "", focus: me.focus || "", tags: (me.tags || []).join(", "), bio: me.bio || "", contact: me.contact || "" });
+    setProfileForm({
+      programmeDegree: me.programme_degree || "",
+      researchArea: me.research_area || "",
+      skills: me.skills || "",
+      tags: (me.tags || []).join(", "),
+      lookingFor: me.looking_for || "",
+      bio: me.bio || "",
+      linkedin: me.linkedin || "",
+      photoUrl: me.photo_url || "",
+    });
     setEditingProfile(true);
   }
 
   async function saveProfileEdits(e) {
     e.preventDefault();
     const updates = {
-      role: profileForm.role.trim(), focus: profileForm.focus.trim(),
+      programme_degree: profileForm.programmeDegree.trim(),
+      research_area: profileForm.researchArea.trim(),
+      skills: profileForm.skills.trim(),
       tags: profileForm.tags.split(",").map((t) => t.trim()).filter(Boolean),
-      bio: profileForm.bio.trim(), contact: profileForm.contact.trim(),
+      looking_for: profileForm.lookingFor.trim(),
+      bio: profileForm.bio.trim(),
+      linkedin: profileForm.linkedin.trim(),
+      photo_url: profileForm.photoUrl.trim(),
     };
     const { data, error } = await supabase.from("profiles").update(updates).eq("id", me.id).select().single();
     if (!error) {
@@ -252,8 +270,12 @@ export default function App() {
     const q = directorySearch.trim().toLowerCase();
     if (!q) return true;
     return (
-      p.name.toLowerCase().includes(q) || (p.role || "").toLowerCase().includes(q) ||
-      (p.focus || "").toLowerCase().includes(q) || (p.tags || []).some((t) => t.toLowerCase().includes(q))
+      p.name.toLowerCase().includes(q) ||
+      (p.programme_degree || "").toLowerCase().includes(q) ||
+      (p.research_area || "").toLowerCase().includes(q) ||
+      (p.skills || "").toLowerCase().includes(q) ||
+      (p.looking_for || "").toLowerCase().includes(q) ||
+      (p.tags || []).some((t) => t.toLowerCase().includes(q))
     );
   });
 
@@ -478,7 +500,43 @@ export default function App() {
   const emptySheetForm = { category: "curriculum", title: "", read: "5 min", tags: "", body: "" };
   const [sheetForm, setSheetForm] = useState(emptySheetForm);
   const [editingSheetId, setEditingSheetId] = useState(null);
-  const [adminSection, setAdminSection] = useState("curriculum");
+  const [adminSection, setAdminSection] = useState("dashboard");
+
+  // ---------- Admin: programme dashboard ----------
+  const [dashboardStats, setDashboardStats] = useState(null);
+  const [dashboardLoading, setDashboardLoading] = useState(false);
+  const [soloVentureList, setSoloVentureList] = useState([]);
+
+  async function loadDashboard() {
+    setDashboardLoading(true);
+    try {
+      const [{ data: profs }, { data: ventureRows }, { data: memberRows }] = await Promise.all([
+        supabase.from("profiles").select("id, looking_for"),
+        supabase.from("ventures").select("id, title, pathway"),
+        supabase.from("venture_members").select("venture_id"),
+      ]);
+      const memberCounts = {};
+      (memberRows || []).forEach((m) => { memberCounts[m.venture_id] = (memberCounts[m.venture_id] || 0) + 1; });
+      const solo = (ventureRows || []).filter((v) => (memberCounts[v.id] || 0) <= 1);
+      setDashboardStats({
+        totalParticipants: (profs || []).length,
+        withLookingFor: (profs || []).filter((p) => p.looking_for && p.looking_for.trim()).length,
+        totalVentures: (ventureRows || []).length,
+        problemCount: (ventureRows || []).filter((v) => v.pathway === "problem").length,
+        researchCount: (ventureRows || []).filter((v) => v.pathway === "research").length,
+      });
+      setSoloVentureList(solo);
+    } catch {
+      setDashboardStats(null);
+      setSoloVentureList([]);
+    } finally {
+      setDashboardLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (tab === "admin" && adminSection === "dashboard" && me?.is_admin) loadDashboard();
+  }, [tab, adminSection, me]);
 
   function startNewSheet() { setSheetForm(emptySheetForm); setEditingSheetId("new"); }
   function startEditSheet(s) {
@@ -586,11 +644,14 @@ export default function App() {
               <input style={inputStyle} placeholder="Full name" value={authForm.name} onChange={(e) => setAuthForm((f) => ({ ...f, name: e.target.value }))} />
               <input style={inputStyle} type="email" name="email" autoComplete="email" placeholder="Email" value={authForm.email} onChange={(e) => setAuthForm((f) => ({ ...f, email: e.target.value }))} />
               <input style={inputStyle} type="password" name="new-password" autoComplete="new-password" placeholder="Password (6+ characters)" value={authForm.password} onChange={(e) => setAuthForm((f) => ({ ...f, password: e.target.value }))} />
-              <input style={inputStyle} placeholder="Degree & year (e.g. PhD Year 2, Engineering)" value={authForm.role} onChange={(e) => setAuthForm((f) => ({ ...f, role: e.target.value }))} />
-              <input style={inputStyle} placeholder="Individual interest (optional — join or start a venture in the Ventures tab)" value={authForm.focus} onChange={(e) => setAuthForm((f) => ({ ...f, focus: e.target.value }))} />
-              <input style={inputStyle} placeholder="Sector interest (Healthcare, AI, Aviation, Cities, IP-driven)" value={authForm.tags} onChange={(e) => setAuthForm((f) => ({ ...f, tags: e.target.value }))} />
-              <textarea style={{ ...inputStyle, resize: "vertical" }} rows={2} placeholder="Short bio" value={authForm.bio} onChange={(e) => setAuthForm((f) => ({ ...f, bio: e.target.value }))} />
-              <input style={inputStyle} placeholder="Other contact (optional)" value={authForm.contact} onChange={(e) => setAuthForm((f) => ({ ...f, contact: e.target.value }))} />
+              <input style={inputStyle} placeholder="Programme / Degree (e.g. PhD Year 2, Engineering)" value={authForm.programmeDegree} onChange={(e) => setAuthForm((f) => ({ ...f, programmeDegree: e.target.value }))} />
+              <input style={inputStyle} placeholder="Research area" value={authForm.researchArea} onChange={(e) => setAuthForm((f) => ({ ...f, researchArea: e.target.value }))} />
+              <input style={inputStyle} placeholder="Skills & expertise" value={authForm.skills} onChange={(e) => setAuthForm((f) => ({ ...f, skills: e.target.value }))} />
+              <input style={inputStyle} placeholder="Areas of interest (comma separated, e.g. Healthcare, AI, Cities)" value={authForm.tags} onChange={(e) => setAuthForm((f) => ({ ...f, tags: e.target.value }))} />
+              <input style={inputStyle} placeholder="Looking for (e.g. a technical co-founder, a design partner)" value={authForm.lookingFor} onChange={(e) => setAuthForm((f) => ({ ...f, lookingFor: e.target.value }))} />
+              <textarea style={{ ...inputStyle, resize: "vertical" }} rows={2} placeholder="Short bio (optional)" value={authForm.bio} onChange={(e) => setAuthForm((f) => ({ ...f, bio: e.target.value }))} />
+              <input style={inputStyle} placeholder="LinkedIn (optional)" value={authForm.linkedin} onChange={(e) => setAuthForm((f) => ({ ...f, linkedin: e.target.value }))} />
+              <input style={inputStyle} placeholder="Photo URL (optional)" value={authForm.photoUrl} onChange={(e) => setAuthForm((f) => ({ ...f, photoUrl: e.target.value }))} />
               <input style={inputStyle} placeholder="Admin code (only if you're programme staff)" value={authForm.adminCode} onChange={(e) => setAuthForm((f) => ({ ...f, adminCode: e.target.value }))} />
               {authError && <div style={{ fontSize: "12px", color: "#e08a6b" }}>{authError}</div>}
               {authNotice && <div style={{ fontSize: "12px", color: "#8fbf7f" }}>{authNotice}</div>}
@@ -784,18 +845,27 @@ export default function App() {
             <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: "10px", color: "rgba(234,228,214,0.4)", marginBottom: "10px" }}>YOUR PROFILE</div>
             {editingProfile ? (
               <form onSubmit={saveProfileEdits} style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                <input style={inputStyle} placeholder="Degree & year" value={profileForm.role} onChange={(e) => setProfileForm((f) => ({ ...f, role: e.target.value }))} />
-                <input style={inputStyle} placeholder="Individual interest (optional)" value={profileForm.focus} onChange={(e) => setProfileForm((f) => ({ ...f, focus: e.target.value }))} />
-                <input style={inputStyle} placeholder="Sector interest" value={profileForm.tags} onChange={(e) => setProfileForm((f) => ({ ...f, tags: e.target.value }))} />
+                <input style={inputStyle} placeholder="Programme / Degree" value={profileForm.programmeDegree} onChange={(e) => setProfileForm((f) => ({ ...f, programmeDegree: e.target.value }))} />
+                <input style={inputStyle} placeholder="Research area" value={profileForm.researchArea} onChange={(e) => setProfileForm((f) => ({ ...f, researchArea: e.target.value }))} />
+                <input style={inputStyle} placeholder="Skills & expertise" value={profileForm.skills} onChange={(e) => setProfileForm((f) => ({ ...f, skills: e.target.value }))} />
+                <input style={inputStyle} placeholder="Areas of interest (comma separated)" value={profileForm.tags} onChange={(e) => setProfileForm((f) => ({ ...f, tags: e.target.value }))} />
+                <input style={inputStyle} placeholder="Looking for" value={profileForm.lookingFor} onChange={(e) => setProfileForm((f) => ({ ...f, lookingFor: e.target.value }))} />
                 <textarea style={{ ...inputStyle, resize: "vertical" }} rows={3} placeholder="Short bio" value={profileForm.bio} onChange={(e) => setProfileForm((f) => ({ ...f, bio: e.target.value }))} />
-                <input style={inputStyle} placeholder="Other contact" value={profileForm.contact} onChange={(e) => setProfileForm((f) => ({ ...f, contact: e.target.value }))} />
+                <input style={inputStyle} placeholder="LinkedIn" value={profileForm.linkedin} onChange={(e) => setProfileForm((f) => ({ ...f, linkedin: e.target.value }))} />
+                <input style={inputStyle} placeholder="Photo URL" value={profileForm.photoUrl} onChange={(e) => setProfileForm((f) => ({ ...f, photoUrl: e.target.value }))} />
                 <div style={{ display: "flex", gap: "8px" }}><button type="submit" style={{ ...buttonPrimary, flex: 1 }}>Save</button><button type="button" onClick={() => setEditingProfile(false)} style={buttonGhost}>Cancel</button></div>
               </form>
             ) : (
               <div style={{ background: "rgba(234,228,214,0.06)", border: "1px solid rgba(234,228,214,0.15)", borderRadius: "8px", padding: "14px" }}>
+                {me.photo_url && (
+                  <img src={me.photo_url} alt="" style={{ width: "44px", height: "44px", borderRadius: "50%", objectFit: "cover", marginBottom: "8px" }} onError={(e) => { e.target.style.display = "none"; }} />
+                )}
                 <div style={{ fontWeight: 600, fontSize: "14px" }}>{me.name}</div>
-                <div style={{ fontSize: "12px", color: "rgba(234,228,214,0.55)", marginBottom: "8px" }}>{me.role}</div>
+                <div style={{ fontSize: "12px", color: "rgba(234,228,214,0.55)", marginBottom: "6px" }}>{me.programme_degree}</div>
+                {me.research_area && <div style={{ fontSize: "11.5px", color: "rgba(234,228,214,0.5)", marginBottom: "6px" }}>Research: {me.research_area}</div>}
+                {me.looking_for && <div style={{ fontSize: "11.5px", color: "#D98C3D", marginBottom: "6px" }}>Looking for: {me.looking_for}</div>}
                 {me.bio && <p style={{ fontSize: "12.5px", color: "rgba(234,228,214,0.75)" }}>{me.bio}</p>}
+                {me.linkedin && <a href={me.linkedin} target="_blank" rel="noreferrer" style={{ fontSize: "11.5px", color: "#D98C3D", display: "block", marginBottom: "8px" }}>LinkedIn ↗</a>}
                 <button onClick={openEditForm} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#D98C3D", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}><Pencil size={12} /> Edit profile</button>
               </div>
             )}
@@ -803,17 +873,38 @@ export default function App() {
           <main style={{ flex: 1, minWidth: "320px", padding: "24px 28px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "rgba(234,228,214,0.06)", border: "1px solid rgba(234,228,214,0.15)", borderRadius: "6px", padding: "8px 10px", marginBottom: "18px", maxWidth: "360px" }}>
               <Search size={15} color="rgba(234,228,214,0.5)" />
-              <input value={directorySearch} onChange={(e) => setDirectorySearch(e.target.value)} placeholder="Search by name, role, or interest" style={{ background: "transparent", border: "none", outline: "none", color: "#EAE4D6", fontSize: "13px", width: "100%" }} />
+              <input value={directorySearch} onChange={(e) => setDirectorySearch(e.target.value)} placeholder="Search by name, research area, skills, or interest" style={{ background: "transparent", border: "none", outline: "none", color: "#EAE4D6", fontSize: "13px", width: "100%" }} />
             </div>
             {directoryLoading ? <div style={{ fontSize: "13px", color: "rgba(234,228,214,0.5)" }}>Loading…</div> : (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "12px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "12px" }}>
                 {filteredDirectory.map((p) => {
                   const isMe = p.id === me.id;
                   return (
                     <div key={p.id} style={{ background: "rgba(234,228,214,0.06)", border: "1px solid rgba(234,228,214,0.15)", borderRadius: "8px", padding: "14px" }}>
-                      <div style={{ fontWeight: 600, fontSize: "14px" }}>{p.name} {isMe && <span style={{ fontSize: "10px", color: "#D98C3D" }}>(you)</span>}</div>
-                      <div style={{ fontSize: "11.5px", color: "rgba(234,228,214,0.55)", marginBottom: "8px" }}>{p.role}{p.focus && ` · ${p.focus}`}</div>
-                      {!isMe && <button onClick={() => messageProfile(p)} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#D98C3D", background: "transparent", border: "1px solid rgba(217,140,61,0.35)", borderRadius: "6px", padding: "6px 10px", cursor: "pointer" }}><MessageSquare size={12} /> Message</button>}
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                        {p.photo_url && (
+                          <img src={p.photo_url} alt="" style={{ width: "28px", height: "28px", borderRadius: "50%", objectFit: "cover" }} onError={(e) => { e.target.style.display = "none"; }} />
+                        )}
+                        <div style={{ fontWeight: 600, fontSize: "14px" }}>{p.name} {isMe && <span style={{ fontSize: "10px", color: "#D98C3D" }}>(you)</span>}</div>
+                      </div>
+                      <div style={{ fontSize: "11.5px", color: "rgba(234,228,214,0.55)", marginBottom: "6px" }}>
+                        {p.programme_degree}{p.research_area && ` · ${p.research_area}`}
+                      </div>
+                      {p.skills && <div style={{ fontSize: "11px", color: "rgba(234,228,214,0.45)", marginBottom: "6px" }}>Skills: {p.skills}</div>}
+                      {p.looking_for && <div style={{ fontSize: "11px", color: "#D98C3D", marginBottom: "8px" }}>Looking for: {p.looking_for}</div>}
+                      {p.tags?.length > 0 && (
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "5px", marginBottom: "10px" }}>
+                          {p.tags.slice(0, 4).map((t) => (
+                            <span key={t} style={{ fontSize: "10.5px", background: "rgba(217,140,61,0.15)", color: "#D98C3D", padding: "2px 8px", borderRadius: "20px" }}>{t}</span>
+                          ))}
+                        </div>
+                      )}
+                      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                        {!isMe && (
+                          <button onClick={() => messageProfile(p)} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#D98C3D", background: "transparent", border: "1px solid rgba(217,140,61,0.35)", borderRadius: "6px", padding: "6px 10px", cursor: "pointer" }}><MessageSquare size={12} /> Message</button>
+                        )}
+                        {p.linkedin && <a href={p.linkedin} target="_blank" rel="noreferrer" style={{ fontSize: "11.5px", color: "rgba(234,228,214,0.5)" }}>LinkedIn ↗</a>}
+                      </div>
                     </div>
                   );
                 })}
@@ -858,10 +949,59 @@ export default function App() {
       {tab === "admin" && me.is_admin && (
         <div style={{ flex: 1, maxWidth: "1180px", margin: "0 auto", width: "100%", padding: "24px 28px" }}>
           <div style={{ display: "flex", gap: "6px", marginBottom: "22px" }}>
-            {[{ id: "curriculum", label: "Curriculum Manager" }, { id: "moderation", label: "Conversations Overview" }].map((s) => (
+            {[{ id: "dashboard", label: "Programme Dashboard" }, { id: "curriculum", label: "Curriculum Manager" }, { id: "moderation", label: "Conversations Overview" }].map((s) => (
               <button key={s.id} onClick={() => setAdminSection(s.id)} style={{ fontSize: "12.5px", padding: "8px 14px", borderRadius: "6px", border: adminSection === s.id ? "1px solid rgba(217,140,61,0.5)" : "1px solid rgba(234,228,214,0.15)", background: adminSection === s.id ? "rgba(217,140,61,0.16)" : "transparent", color: adminSection === s.id ? "#D98C3D" : "rgba(234,228,214,0.6)", cursor: "pointer" }}>{s.label}</button>
             ))}
           </div>
+
+          {adminSection === "dashboard" && (
+            <div>
+              {dashboardLoading ? (
+                <div style={{ fontSize: "12.5px", color: "rgba(234,228,214,0.4)" }}>Loading…</div>
+              ) : !dashboardStats ? (
+                <div style={{ fontSize: "12.5px", color: "rgba(234,228,214,0.4)" }}>Couldn't load dashboard data.</div>
+              ) : (
+                <>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px", marginBottom: "26px" }}>
+                    {[
+                      { label: "Participants", value: dashboardStats.totalParticipants },
+                      { label: "Profiles with \"Looking For\" filled", value: `${dashboardStats.withLookingFor} / ${dashboardStats.totalParticipants}` },
+                      { label: "Ventures formed", value: dashboardStats.totalVentures },
+                      { label: "Problem-Driven ventures", value: dashboardStats.problemCount },
+                      { label: "Research/IP-Driven ventures", value: dashboardStats.researchCount },
+                      { label: "Ventures still solo", value: soloVentureList.length },
+                    ].map((s) => (
+                      <div key={s.label} style={{ background: "rgba(234,228,214,0.05)", border: "1px solid rgba(234,228,214,0.12)", borderRadius: "10px", padding: "16px" }}>
+                        <div style={{ fontSize: "22px", fontWeight: 700, fontFamily: "'Space Grotesk', sans-serif", color: "#D98C3D" }}>{s.value}</div>
+                        <div style={{ fontSize: "11.5px", color: "rgba(234,228,214,0.55)", marginTop: "4px" }}>{s.label}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div style={{ fontSize: "13px", fontWeight: 600, marginBottom: "10px", color: "#D98C3D" }}>
+                    Ventures still solo (lead only, no teammates yet)
+                  </div>
+                  {soloVentureList.length === 0 ? (
+                    <div style={{ fontSize: "12.5px", color: "rgba(234,228,214,0.4)" }}>
+                      None — every venture has at least one teammate beyond the lead.
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                      {soloVentureList.map((v) => (
+                        <div key={v.id} style={{ display: "flex", justifyContent: "space-between", background: "rgba(234,228,214,0.05)", border: "1px solid rgba(234,228,214,0.12)", borderRadius: "8px", padding: "10px 14px", fontSize: "13px" }}>
+                          <span>{v.title}</span>
+                          <span style={{ color: "rgba(234,228,214,0.5)", fontSize: "11.5px" }}>{v.pathway === "problem" ? "Problem-Driven" : "Research/IP-Driven"}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <p style={{ fontSize: "11px", color: "rgba(234,228,214,0.35)", marginTop: "14px" }}>
+                    Useful for steering participants toward joining an existing venture rather than starting another solo one — a direct nudge point for facilitators during Idea Pitch and Venture Recruitment.
+                  </p>
+                </>
+              )}
+            </div>
+          )}
 
           {adminSection === "curriculum" && (
             <div>
