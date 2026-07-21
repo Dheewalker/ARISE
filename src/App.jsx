@@ -9,8 +9,6 @@ const CATEGORIES = [
   { id: "all", label: "All" },
   { id: "programme", label: "Programme" },
   { id: "curriculum", label: "Curriculum" },
-  { id: "problem", label: "Problem-Driven" },
-  { id: "research", label: "Research/IP-Driven" },
 ];
 
 const inputStyle = {
@@ -586,8 +584,8 @@ export default function App() {
           {authMode === "signup" ? (
             <form onSubmit={handleSignUp} noValidate style={{ display: "flex", flexDirection: "column", gap: "9px" }}>
               <input style={inputStyle} placeholder="Full name" value={authForm.name} onChange={(e) => setAuthForm((f) => ({ ...f, name: e.target.value }))} />
-              <input style={inputStyle} type="email" placeholder="Email" value={authForm.email} onChange={(e) => setAuthForm((f) => ({ ...f, email: e.target.value }))} />
-              <input style={inputStyle} type="password" placeholder="Password (6+ characters)" value={authForm.password} onChange={(e) => setAuthForm((f) => ({ ...f, password: e.target.value }))} />
+              <input style={inputStyle} type="email" name="email" autoComplete="email" placeholder="Email" value={authForm.email} onChange={(e) => setAuthForm((f) => ({ ...f, email: e.target.value }))} />
+              <input style={inputStyle} type="password" name="new-password" autoComplete="new-password" placeholder="Password (6+ characters)" value={authForm.password} onChange={(e) => setAuthForm((f) => ({ ...f, password: e.target.value }))} />
               <input style={inputStyle} placeholder="Degree & year (e.g. PhD Year 2, Engineering)" value={authForm.role} onChange={(e) => setAuthForm((f) => ({ ...f, role: e.target.value }))} />
               <input style={inputStyle} placeholder="Individual interest (optional — join or start a venture in the Ventures tab)" value={authForm.focus} onChange={(e) => setAuthForm((f) => ({ ...f, focus: e.target.value }))} />
               <input style={inputStyle} placeholder="Sector interest (Healthcare, AI, Aviation, Cities, IP-driven)" value={authForm.tags} onChange={(e) => setAuthForm((f) => ({ ...f, tags: e.target.value }))} />
@@ -600,8 +598,8 @@ export default function App() {
             </form>
           ) : (
             <form onSubmit={handleSignIn} noValidate style={{ display: "flex", flexDirection: "column", gap: "9px" }}>
-              <input style={inputStyle} type="email" placeholder="Email" value={authForm.email} onChange={(e) => setAuthForm((f) => ({ ...f, email: e.target.value }))} />
-              <input style={inputStyle} type="password" placeholder="Password" value={authForm.password} onChange={(e) => setAuthForm((f) => ({ ...f, password: e.target.value }))} />
+              <input style={inputStyle} type="email" name="email" autoComplete="email" placeholder="Email" value={authForm.email} onChange={(e) => setAuthForm((f) => ({ ...f, email: e.target.value }))} />
+              <input style={inputStyle} type="password" name="current-password" autoComplete="current-password" placeholder="Password" value={authForm.password} onChange={(e) => setAuthForm((f) => ({ ...f, password: e.target.value }))} />
               {authError && <div style={{ fontSize: "12px", color: "#e08a6b" }}>{authError}</div>}
               <button type="submit" disabled={authBusy} style={{ ...buttonPrimary, marginTop: "4px" }}>{authBusy ? "Signing in…" : "Sign in"}</button>
             </form>
@@ -874,7 +872,7 @@ export default function App() {
               {editingSheetId && (
                 <form onSubmit={saveSheetForm} style={{ background: "rgba(234,228,214,0.06)", border: "1px solid rgba(217,140,61,0.3)", borderRadius: "8px", padding: "16px", marginBottom: "20px", display: "flex", flexDirection: "column", gap: "8px" }}>
                   <select value={sheetForm.category} onChange={(e) => setSheetForm((f) => ({ ...f, category: e.target.value }))} style={inputStyle}>
-                    <option value="programme">Programme</option><option value="curriculum">Curriculum</option><option value="problem">Problem-Driven</option><option value="research">Research/IP-Driven</option>
+                    <option value="programme">Programme</option><option value="curriculum">Curriculum</option>
                   </select>
                   <input style={inputStyle} placeholder="Sheet title" value={sheetForm.title} onChange={(e) => setSheetForm((f) => ({ ...f, title: e.target.value }))} />
                   <input style={inputStyle} placeholder="Read time" value={sheetForm.read} onChange={(e) => setSheetForm((f) => ({ ...f, read: e.target.value }))} />
