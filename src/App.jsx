@@ -107,6 +107,18 @@ export default function App() {
 
       if (!data.session) {
         setAuthNotice("Account created — check your email to confirm, then sign in.");
+      } else {
+        // A session already exists at this point (email confirmation is off in this
+        // Supabase project). Fetch the profile directly here rather than relying on
+        // the session-driven effect elsewhere — that effect can fire the moment the
+        // session appears, which is before this insert above has landed, and would
+        // otherwise find no profile row and get stuck on the login screen.
+        const { data: freshProfile, error: fetchError } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", data.user.id)
+          .single();
+        if (!fetchError) setMe(freshProfile);
       }
     } catch (err) {
       console.error("Sign up error:", err);
@@ -286,6 +298,28 @@ export default function App() {
   useEffect(() => { if (tab === "messages" && me) loadConversations(); }, [tab, me]);
   useEffect(() => { if (threadScrollRef.current) threadScrollRef.current.scrollTop = threadScrollRef.current.scrollHeight; }, [threadMessages]);
 
+  // Realtime: live-append new DMs into the open thread, and refresh the conversation list.
+  useEffect(() => {
+    if (!me) return;
+    const channel = supabase
+      .channel(`dm-inbox-${me.id}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "direct_messages" }, (payload) => {
+        const m = payload.new;
+        const involvesMe = m.sender_id === me.id || m.recipient_id === me.id;
+        if (!involvesMe) return;
+        setActiveThreadWith((current) => {
+          if (current && (m.sender_id === current.id || m.recipient_id === current.id)) {
+            setThreadMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
+          }
+          return current;
+        });
+        loadConversations();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me]);
+
   async function openThread(otherId, otherName) {
     setActiveThreadWith({ id: otherId, name: otherName });
     setThreadLoading(true);
@@ -308,7 +342,7 @@ export default function App() {
       .select()
       .single();
     if (!error) {
-      setThreadMessages((t) => [...t, data]);
+      setThreadMessages((t) => (t.some((x) => x.id === data.id) ? t : [...t, data]));
       setMessageText("");
       loadConversations();
     }
@@ -409,6 +443,19 @@ export default function App() {
       if (!error) setVentureThread(data || []);
       setVentureThreadLoading(false);
     })();
+
+    const channel = supabase
+      .channel(`venture-chat-${selectedVentureId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "venture_messages", filter: `venture_id=eq.${selectedVentureId}` },
+        (payload) => {
+          const m = payload.new;
+          setVentureThread((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, [selectedVentureId]);
 
   useEffect(() => { if (ventureThreadScrollRef.current) ventureThreadScrollRef.current.scrollTop = ventureThreadScrollRef.current.scrollHeight; }, [ventureThread]);
@@ -423,7 +470,7 @@ export default function App() {
       .select()
       .single();
     if (!error) {
-      setVentureThread((t) => [...t, data]);
+      setVentureThread((t) => (t.some((x) => x.id === data.id) ? t : [...t, data]));
       setVentureMessageText("");
     }
     setSendingVentureMessage(false);
